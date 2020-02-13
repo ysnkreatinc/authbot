@@ -56,3 +56,23 @@ class LoginController extends Controller
     }
 
 }
+
+
+/*
+TO SUBSCRIBE PAGES
+https://www.facebook.com/dialog/oauth?response_type=token&display=popup&client_id=3077128572332597&redirect_uri=https%3A%2F%2Fdevelopers.facebook.com%2Ftools%2Fexplorer%2Fcallback&scope=pages_messaging
+
+
+GIVING PERMISSION
+
+https://www.facebook.com/v6.0/dialog/oauth?
+  client_id=3077128572332597
+  &redirect_uri=https://39cefc64.ngrok.io/done
+  &scope=public_profile%2Cemail%2Cmanage_pages%2Cpages_messaging%2Cpages_messaging_subscriptions
+  &state={state-param}
+
+
+  PERMISSION
+  
+
+*/

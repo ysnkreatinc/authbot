@@ -33,3 +33,7 @@ Route::post("/trivia", "MainbotController@receive");
 Route::get('/logout', function(){
     Auth::logout();
 });
+
+
+Route::get('/infos', 'MainbotController@getInformation');
+Route::get('/storesession', 'MainbotController@storesession');
