@@ -15,6 +15,10 @@ class CreateConversationsTable extends Migration
     {
         Schema::create('conversations', function (Blueprint $table) {
             $table->bigIncrements('id');
+            $table->text('sender');
+            $table->text('recipient');
+            $table->text('question');
+            $table->text('answer');
             $table->timestamps();
         });
     }

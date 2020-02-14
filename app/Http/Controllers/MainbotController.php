@@ -9,11 +9,12 @@ use Illuminate\Support\Facades\Session;
 use App\Page;
 use Socialite;
 use App\Store;
+use App\Conversation;
 use Auth;
+use Cookie;
 
 class MainbotController extends Controller
 {
-
 
     public function receive(Request $request)
     {
@@ -21,8 +22,9 @@ class MainbotController extends Controller
         //get the user’s id
         $pageId = $data["entry"][0]["id"];
         $id = $data["entry"][0]["messaging"][0]["sender"]["id"];
+        $idr = $data["entry"][0]["messaging"][0]["recipient"]["id"];
         $msg = $data["entry"][0]["messaging"][0]["message"]["text"];
-        $res = $this->getResponse($msg);
+        $res = $this->getResponse($msg, $id, $idr);
         if ($res == '')
             $res = "Sorry i don't understand";
         $checkPage = Page::Where('page_id', $pageId)->first();
@@ -30,7 +32,8 @@ class MainbotController extends Controller
     }
 
     private function sendTextMessage($recipientId, $messageText, $pageToken)
-    {
+    {   
+        
         $messageData = [
             "recipient" => [
                 "id" => $recipientId
@@ -39,24 +42,75 @@ class MainbotController extends Controller
                 "text" => $messageText
             ]
         ];
+        
+        
+/*
+        $messageData = [
+            'recipient' => 
+            [
+              'id' => $recipientId,
+            ],
+            'messaging_type' => 'RESPONSE',
+            'message' => 
+            [
+              'text' => $messageText,
+              'quick_replies' => 
+              [
+                [
+                  'content_type' => 'text',
+                  'title' => 'Red',
+                  'payload' => 'This is the value you get back',
+                  'image_url' => 'http://ecap.pcd.go.th/public/assets/img/green.png',
+                ],
+                [
+                    'content_type' => 'text',
+                    'title' => 'Bilal',
+                    'payload' => 'This is the value you get back',
+                    'image_url' => 'http://ecap.pcd.go.th/public/assets/img/gray.png',
+                ],
+                [
+                    'content_type' => 'text',
+                    'title' => 'Yassine',
+                    'payload' => 'This is the value you get back',
+                    'image_url' => 'http://ecap.pcd.go.th/public/assets/img/yello.png',
+                ],
+                [
+                    'content_type' => 'text',
+                    'title' => 'Rida',
+                    'payload' => 'This is the value you get back',
+                    'image_url' => 'http://ecap.pcd.go.th/public/assets/img/red.png',
+                ],            
+              ],
+            ],
+        ];
+        */
 
-        /*
+
+       // $json = 
+
+
+    // $cookiestore = tempnam(storage_path('/cookies'), '_cookiejar_' );
+    
     $ch = curl_init('https://graph.facebook.com/v2.6/me/messages?access_token='.$pageToken); 
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HEADER, false);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messageData));
+        // curl_setopt( $ch, CURLOPT_COOKIEFILE, $cookiestore );
+        // curl_setopt( $ch, CURLOPT_COOKIEJAR, $cookiestore );
         curl_exec($ch);
-        */
-        
+
+        /*
         $client = new Client();
-        $result = $client->post('https://graph.facebook.com/v2.6/me/messages?access_token='.$pageToken, [
+        $result = $client->GET('https://graph.facebook.com/v2.6/me/messages?access_token='.$pageToken, [
+            'form_params' => $messageData,
             'headers' => [
                 'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
             ]
         ]);
-        
+        */
     }
 
     public function getToken($pageId){
@@ -126,7 +180,7 @@ class MainbotController extends Controller
         ]);
     }
 
-    public function getResponse($msg){
+    public function getResponse($msg, $sender, $recipient){
 
         $client = new Client();
         $result = $client->get('https://api.wit.ai/message?v=20200206&q='.$msg, [
@@ -141,7 +195,7 @@ class MainbotController extends Controller
         foreach ($dataIntent->entities as $key => $val)
         {
             if ($key == 'greetings'){
-                return "Hello, how can i help you ?";
+                return "Hello, how can i help you ?". Session::get('greetings');
                 break;
             }
             else if ($val[0]->value == 'learn'){
@@ -152,33 +206,99 @@ class MainbotController extends Controller
             else if ($key == 'langs'){
                 foreach($val as $key2 => $val2){
                     if($val2->confidence * 100 > 70){
-                        Session::put('lang', $msg);
+                        $this->setConversation($sender,$recipient, "What do you learn ?", $msg);
                         return "What's your level ?";
                         break;
                     }
                 }
             }
             else if ($key == 'levels'){
-                (new Store)->setSession('level', $msg);
+                $this->setConversation($sender,$recipient, "What's your level ?", $msg);
                 return "Where are you from ?";
             }
             else if ($key == 'location'){
-                (new Store)->setSession('location', $msg);
+                $this->setConversation($sender,$recipient, "Where are you from ?", $msg);
                 return "Please give us your email address.";
                 break;
             }
             else if ($key == 'email'){
-                (new Store)->setSession('email', $msg);
+                $this->setConversation($sender,$recipient, "Please give us your email address.", $msg);
                 return "Please enter you phone number.";
                 break;
             }
             else if($key == 'phone_number')
             {
-                return ('Your want to learn : '. Session::get('lang')
+                $this->setConversation($sender,$recipient, "Please enter you phone number.", $msg);
+                $conversation = Conversation::Where('sender', $sender)->Where('recipient', $recipient)->GET();
+                return ('You want to learn : '. $conversation[0]->answer . 
+                    ' Your level is : '. $conversation[1]->answer .
+                    ' Your are from : '. $conversation[2]->answer .
+                    ' Your address email : '. $conversation[3]->answer .
+                    ' Your phone number : '. $conversation[4]->answer
             );
                 break;
             }
         }
+
+    }
+
+    public function getInformation(){
+        $quikreply = [
+            'recipient' => 
+            [
+              'id' => '<PSID>',
+            ],
+            'messaging_type' => 'RESPONSE',
+            'message' => 
+            [
+              'text' => 'Pick a color:',
+              'quick_replies' => 
+              [
+                [
+                  'content_type' => 'text',
+                  'title' => 'Red',
+                  'payload' => '<POSTBACK_PAYLOAD>',
+                  'image_url' => 'http://example.com/img/red.png',
+                ],
+              ],
+            ],
+        ];
+
+        return $quikreply;
+    }
+
+    public function setConversation($sender, $recipient, $question, $answer){
+        
+        $checkIt = Conversation::WHERE('sender', $sender)
+                    ->WHERE('recipient', $recipient)
+                    ->WHERE('question', $question)
+                    ->GET()
+                    ->COUNT();
+
+        if ($checkIt > 0)
+            {
+                $update = Conversation::WHERE('sender', $sender)
+                ->WHERE('recipient', $recipient)
+                ->WHERE('question', $question)
+                ->UPDATE(['answer' => $answer]);
+
+                if ($update)
+                    return true;
+            }
+        else
+            {
+                $conversation = new Conversation;
+                $conversation->sender = $sender;
+                $conversation->recipient = $recipient;
+                $conversation->question = $question;
+                $conversation->answer = $answer;
+
+                if($conversation->save())
+                    return true;
+            }
+
+
+            return false;
 
     }
 
